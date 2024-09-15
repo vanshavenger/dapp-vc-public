@@ -22,8 +22,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Buffer } from "buffer";
 import { TRANSACTION_TIME } from "@/constants";
-import { Loader2, RefreshCw, Send, FileSignature, Coins, Wallet } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Loader2,
+  RefreshCw,
+  Send,
+  FileSignature,
+  Coins,
+  Wallet,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 window.Buffer = Buffer;
 
@@ -62,9 +75,12 @@ export const SolanaFeatures: React.FC = () => {
   const fetchTokenBalances = useCallback(async () => {
     if (publicKey) {
       try {
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
-          programId: spl.TOKEN_PROGRAM_ID,
-        });
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+          publicKey,
+          {
+            programId: spl.TOKEN_PROGRAM_ID,
+          },
+        );
         console.log("Token accounts:", tokenAccounts);
 
         const balances = await Promise.all(
@@ -72,11 +88,17 @@ export const SolanaFeatures: React.FC = () => {
             return {
               mint: accountInfo.account.data["parsed"]["info"]["mint"],
               owner: accountInfo.account.data["parsed"]["info"]["owner"],
-              balance: accountInfo.account.data["parsed"]["info"]["tokenAmount"]["amount"],
-              decimals: accountInfo.account.data["parsed"]["info"]["tokenAmount"]["decimals"],
+              balance:
+                accountInfo.account.data["parsed"]["info"]["tokenAmount"][
+                  "amount"
+                ],
+              decimals:
+                accountInfo.account.data["parsed"]["info"]["tokenAmount"][
+                  "decimals"
+                ],
               symbol: "TOKEN", // mintInfo.symbol,
             };
-          })
+          }),
         );
 
         console.log("Token balances:", balances);
@@ -118,7 +140,7 @@ export const SolanaFeatures: React.FC = () => {
           fromPubkey: publicKey,
           toPubkey: toPublicKey,
           lamports,
-          programId: SystemProgram.programId
+          programId: SystemProgram.programId,
         }),
       );
       const signature = await sendTransaction(transaction, connection);
@@ -163,7 +185,7 @@ export const SolanaFeatures: React.FC = () => {
       setSignature(bs58.encode(signedMessage));
       toast.success("Message signed successfully!");
     } catch (error) {
-      console.error('Signing error:', error);
+      console.error("Signing error:", error);
       toast.error(`Failed to sign message: ${(error as Error).message}`);
     } finally {
       setIsLoading(false);
@@ -212,55 +234,55 @@ export const SolanaFeatures: React.FC = () => {
     }
   };
 
-const handleTokenTransfer = async () => {
-  if (!publicKey || !sendTransaction) {
-    toast.error("Wallet not connected");
-    return;
-  }
-  setIsLoading(true);
-  try {
-    const toPublicKey = new PublicKey(recipient);
-    const tokenMint = new PublicKey(selectedToken);
-    
-    const fromTokenAccount = await spl.getAssociatedTokenAddress(
-      tokenMint,
-      publicKey
-    );
-    
-    const toTokenAccount = await spl.getAssociatedTokenAddress(
-      tokenMint,
-      toPublicKey
-    );
-
-    const tokenInfo = tokenBalances.find(t => t.mint === selectedToken);
-    if (!tokenInfo) throw new Error("Token not found");
-
-    const tokenAmount = parseFloat(amount) * Math.pow(10, tokenInfo.decimals);
-    if (isNaN(tokenAmount) || tokenAmount <= 0) {
-      throw new Error("Invalid amount");
+  const handleTokenTransfer = async () => {
+    if (!publicKey || !sendTransaction) {
+      toast.error("Wallet not connected");
+      return;
     }
+    setIsLoading(true);
+    try {
+      const toPublicKey = new PublicKey(recipient);
+      const tokenMint = new PublicKey(selectedToken);
 
-    const transaction = new Transaction().add(
-      spl.createAssociatedTokenAccountInstruction(
+      const fromTokenAccount = await spl.getAssociatedTokenAddress(
+        tokenMint,
         publicKey,
-        toTokenAccount,
+      );
+
+      const toTokenAccount = await spl.getAssociatedTokenAddress(
+        tokenMint,
         toPublicKey,
-        tokenMint
-      ),
-      spl.createTransferInstruction(
-        fromTokenAccount,
-        toTokenAccount,
-        publicKey,
-        BigInt(tokenAmount)
-      )
-    );
+      );
 
-    const latestBlockhash = await connection.getLatestBlockhash();
-    transaction.recentBlockhash = latestBlockhash.blockhash;
-    transaction.feePayer = publicKey;
+      const tokenInfo = tokenBalances.find((t) => t.mint === selectedToken);
+      if (!tokenInfo) throw new Error("Token not found");
 
-    const signature = await sendTransaction(transaction, connection);
-     const startTime = Date.now();
+      const tokenAmount = parseFloat(amount) * Math.pow(10, tokenInfo.decimals);
+      if (isNaN(tokenAmount) || tokenAmount <= 0) {
+        throw new Error("Invalid amount");
+      }
+
+      const transaction = new Transaction().add(
+        spl.createAssociatedTokenAccountInstruction(
+          publicKey,
+          toTokenAccount,
+          toPublicKey,
+          tokenMint,
+        ),
+        spl.createTransferInstruction(
+          fromTokenAccount,
+          toTokenAccount,
+          publicKey,
+          BigInt(tokenAmount),
+        ),
+      );
+
+      const latestBlockhash = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = latestBlockhash.blockhash;
+      transaction.feePayer = publicKey;
+
+      const signature = await sendTransaction(transaction, connection);
+      const startTime = Date.now();
       while (true) {
         const { value: statuses } = await connection.getSignatureStatuses([
           signature,
@@ -276,32 +298,37 @@ const handleTokenTransfer = async () => {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-    // await connection.confirmTransaction({
-    //   signature,
-    //   blockhash: latestBlockhash.blockhash,
-    //   lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-    // });
+      // await connection.confirmTransaction({
+      //   signature,
+      //   blockhash: latestBlockhash.blockhash,
+      //   lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      // });
 
-    toast.success("Token transfer successful!");
-    fetchTokenBalances();
-    setAmount("");
-    setRecipient("");
-    setSelectedToken("");
-  } catch (error) {
-    console.error("Token transfer error:", error);
-    toast.error(`Failed to transfer tokens: ${(error as Error).message}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
-  
+      toast.success("Token transfer successful!");
+      fetchTokenBalances();
+      setAmount("");
+      setRecipient("");
+      setSelectedToken("");
+    } catch (error) {
+      console.error("Token transfer error:", error);
+      toast.error(`Failed to transfer tokens: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card className="col-span-full bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Wallet Balance</span>
-            <Button variant="ghost" size="icon" onClick={fetchBalance} className="h-8 w-8">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={fetchBalance}
+              className="h-8 w-8"
+            >
               <RefreshCw className="h-4 w-4" />
             </Button>
           </CardTitle>
@@ -334,8 +361,16 @@ const handleTokenTransfer = async () => {
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleAirdrop} className="w-full" disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Coins className="mr-2 h-4 w-4" />}
+          <Button
+            onClick={handleAirdrop}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Coins className="mr-2 h-4 w-4" />
+            )}
             Request Airdrop
           </Button>
         </CardFooter>
@@ -366,8 +401,16 @@ const handleTokenTransfer = async () => {
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSendTransaction} className="w-full" disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          <Button
+            onClick={handleSendTransaction}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             Send SOL
           </Button>
         </CardFooter>
@@ -396,13 +439,20 @@ const handleTokenTransfer = async () => {
           )}
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSignMessage} className="w-full" disabled={isLoading}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSignature className="mr-2 h-4 w-4" />}
+          <Button
+            onClick={handleSignMessage}
+            className="w-full"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <FileSignature className="mr-2 h-4 w-4" />
+            )}
             Sign Message
           </Button>
         </CardFooter>
       </Card>
-
 
       <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
@@ -415,9 +465,12 @@ const handleTokenTransfer = async () => {
         <CardContent className="space-y-2">
           {tokenBalances.length > 0 ? (
             tokenBalances.map((token) => (
-              <div key={token.mint} className="flex justify-between items-center">
+              <div
+                key={token.mint}
+                className="flex justify-between items-center"
+              >
                 <span>{token.symbol}</span>
-                <span>{token.balance/LAMPORTS_PER_SOL}</span>
+                <span>{token.balance / LAMPORTS_PER_SOL}</span>
               </div>
             ))
           ) : (
@@ -425,7 +478,11 @@ const handleTokenTransfer = async () => {
           )}
         </CardContent>
         <CardFooter>
-          <Button onClick={fetchTokenBalances} className="w-full" variant="outline">
+          <Button
+            onClick={fetchTokenBalances}
+            className="w-full"
+            variant="outline"
+          >
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh Token Balances
           </Button>
@@ -470,8 +527,16 @@ const handleTokenTransfer = async () => {
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleTokenTransfer} className="w-full" disabled={isLoading || !selectedToken}>
-            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          <Button
+            onClick={handleTokenTransfer}
+            className="w-full"
+            disabled={isLoading || !selectedToken}
+          >
+            {isLoading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-2 h-4 w-4" />
+            )}
             Send Tokens
           </Button>
         </CardFooter>

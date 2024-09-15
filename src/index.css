@@ -241,18 +241,21 @@
   @apply relative z-50;
 }
 
-
 @layer utilities {
   .bg-gradient-to-br {
-    background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+    background-image: linear-gradient(
+      to bottom right,
+      var(--tw-gradient-stops)
+    );
   }
-  
+
   .animate-pulse {
     animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
-  
+
   @keyframes pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.5;
     }
     50% {
