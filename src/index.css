@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -40,7 +40,11 @@
 
 /* Solana DApp Specific Styles */
 .solana-dapp-background {
-  background: linear-gradient(to bottom right, hsl(222, 47%, 11%), hsl(218, 32%, 17%));
+  background: linear-gradient(
+    to bottom right,
+    hsl(222, 47%, 11%),
+    hsl(218, 32%, 17%)
+  );
 }
 
 .solana-dapp-header {
@@ -235,4 +239,24 @@
 /* Adjust the header to ensure wallet buttons are clickable */
 .solana-dapp-header {
   @apply relative z-50;
+}
+
+
+@layer utilities {
+  .bg-gradient-to-br {
+    background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+  }
+  
+  .animate-pulse {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 0.5;
+    }
+    50% {
+      opacity: 0.1;
+    }
+  }
 }

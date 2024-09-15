@@ -1,24 +1,41 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL, PublicKey, Transaction, SystemProgram } from '@solana/web3.js';
-import bs58 from 'bs58';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useCallback } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+} from "@solana/web3.js";
+import bs58 from "bs58";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { toast } from "sonner";
+import { Buffer } from "buffer";
+import { TRANSACTION_TIME } from "@/constants";
+import { Loader2, RefreshCw, Send, FileSignature, Coins } from "lucide-react";
+import { ed25519 } from "@noble/curves/ed25519";
 
+window.Buffer = Buffer;
 
 export const SolanaFeatures: React.FC = () => {
   const { connection } = useConnection();
   const { publicKey, sendTransaction, signMessage } = useWallet();
   const [balance, setBalance] = useState<number | null>(null);
-  const [recipient, setRecipient] = useState('');
-  const [amount, setAmount] = useState('');
-  const [message, setMessage] = useState('');
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [message, setMessage] = useState("");
   const [signature, setSignature] = useState<string | null>(null);
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [airdropAmount, setAirdropAmount] = useState('');
+  const [airdropAmount, setAirdropAmount] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const fetchBalance = useCallback(async () => {
     if (publicKey) {
@@ -26,29 +43,30 @@ export const SolanaFeatures: React.FC = () => {
         const bal = await connection.getBalance(publicKey);
         setBalance(bal / LAMPORTS_PER_SOL);
       } catch (error) {
-        console.error('Error fetching balance:', error);
-        setAlert({ type: 'error', message: 'Failed to fetch balance' });
+        console.error("Error fetching balance:", error);
+        toast.error("Failed to fetch balance");
       }
     }
   }, [connection, publicKey]);
 
   useEffect(() => {
     fetchBalance();
-    const id = setInterval(fetchBalance, 2000); 
+    const id = setInterval(fetchBalance, 5000);
     return () => clearInterval(id);
   }, [fetchBalance]);
 
   const handleSendTransaction = async () => {
     if (!publicKey) {
-      setAlert({ type: 'error', message: 'Wallet not connected' });
+      toast.error("Wallet not connected");
       return;
     }
+    setIsLoading(true);
     try {
       const toPublicKey = new PublicKey(recipient);
       const lamports = LAMPORTS_PER_SOL * parseFloat(amount);
-      
+
       if (isNaN(lamports) || lamports <= 0) {
-        throw new Error('Invalid amount');
+        throw new Error("Invalid amount");
       }
 
       const transaction = new Transaction().add(
@@ -56,93 +74,132 @@ export const SolanaFeatures: React.FC = () => {
           fromPubkey: publicKey,
           toPubkey: toPublicKey,
           lamports,
-        })
+          programId: SystemProgram.programId
+        }),
       );
-
-      const latestBlockhash = await connection.getLatestBlockhash();
-      transaction.recentBlockhash = latestBlockhash.blockhash;
-      transaction.feePayer = publicKey;
-
       const signature = await sendTransaction(transaction, connection);
-      console.log("Transaction sent:", signature);
-      
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      if (confirmation.value.err) {
-        throw new Error('Transaction failed');
+
+      const startTime = Date.now();
+      while (true) {
+        const { value: statuses } = await connection.getSignatureStatuses([
+          signature,
+        ]);
+
+        if (statuses[0]?.confirmationStatus === "confirmed") {
+          break;
+        }
+
+        if (Date.now() - startTime > TRANSACTION_TIME) {
+          throw new Error("Transaction timed out");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
-      setAlert({ type: 'success', message: 'Transaction sent successfully!' });
+      toast.success("Transaction sent successfully!");
       fetchBalance();
+      setAmount("");
+      setRecipient("");
     } catch (error) {
-      console.error('Transaction error:', error);
-      setAlert({ type: 'error', message: `Failed to send transaction: ${(error as Error).message}` });
+      console.error("Transaction error:", error);
+      toast.error(`Failed to send transaction: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSignMessage = async () => {
     if (!signMessage) {
-      setAlert({ type: 'error', message: 'Wallet does not support message signing' });
+      toast.error("Wallet does not support message signing");
       return;
     }
+    setIsLoading(true);
     try {
+      if (publicKey === null) {
+        toast.error("Wallet not connected");
+        return
+      }
       const encodedMessage = new TextEncoder().encode(message);
-      console.log("Encoded message:", encodedMessage);  
       const signedMessage = await signMessage(encodedMessage);
       setSignature(bs58.encode(signedMessage));
-      setAlert({ type: 'success', message: 'Message signed successfully!' });
+      if (!ed25519.verify(signedMessage, encodedMessage, publicKey.toBytes())) throw new Error('Message signature invalid!');
+      toast.success("Message signed successfully!");
     } catch (error) {
       console.error('Signing error:', error);
-      setAlert({ type: 'error', message: `Failed to sign message: ${(error as Error).message}` });
+      toast.error(`Failed to sign message: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleAirdrop = async () => {
     if (!publicKey) {
-      setAlert({ type: 'error', message: 'Wallet not connected' });
+      toast.error("Wallet not connected");
       return;
     }
+    setIsLoading(true);
     try {
       const lamports = LAMPORTS_PER_SOL * parseFloat(airdropAmount);
       if (isNaN(lamports) || lamports <= 0) {
-        throw new Error('Invalid airdrop amount');
+        throw new Error("Invalid airdrop amount");
       }
-      const signature = await connection.requestAirdrop(publicKey, lamports);
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      if (confirmation.value.err) {
-        throw new Error('Airdrop failed');
+
+      const airdropSignature = await connection.requestAirdrop(
+        publicKey,
+        lamports,
+      );
+      const startTime = Date.now();
+      while (true) {
+        const { value: statuses } = await connection.getSignatureStatuses([
+          airdropSignature,
+        ]);
+
+        if (statuses[0]?.confirmationStatus === "confirmed") {
+          break;
+        }
+
+        if (Date.now() - startTime > TRANSACTION_TIME) {
+          throw new Error("Airdrop transaction timed out");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
-      setAlert({ type: 'success', message: 'Airdrop successful!' });
+      toast.success("Airdrop was confirmed!");
       fetchBalance();
+      setAirdropAmount("");
     } catch (error) {
-      console.error('Airdrop error:', error);
-      setAlert({ type: 'error', message: `Airdrop failed: ${(error as Error).message}` });
+      console.error("Airdrop error:", error);
+      toast.error(`Airdrop failed: ${(error as Error).message}`);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      {alert && (
-        <Alert variant={alert.type === 'success' ? "default" : "destructive"}>
-          <AlertTitle>{alert.type === 'success' ? "Success" : "Error"}</AlertTitle>
-          <AlertDescription>{alert.message}</AlertDescription>
-        </Alert>
-      )}
-
-      <Card>
+    <div className="grid gap-6 md:grid-cols-2">
+      <Card className="col-span-full bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
-          <CardTitle>Wallet Balance</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Wallet Balance</span>
+            <Button variant="ghost" size="icon" onClick={fetchBalance} className="h-8 w-8">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </CardTitle>
           <CardDescription>Your current SOL balance</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-3xl font-bold">
-            {balance !== null ? `${balance.toFixed(9)} SOL` : 'Connect wallet to view balance'}
+          <p className="text-4xl font-bold text-primary">
+            {balance !== null
+              ? `${balance.toFixed(9)} SOL`
+              : "Connect wallet to view balance"}
           </p>
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
-          <CardTitle>Airdrop</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-primary" />
+            Airdrop
+          </CardTitle>
           <CardDescription>Request SOL airdrop (Devnet only)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -151,16 +208,23 @@ export const SolanaFeatures: React.FC = () => {
             placeholder="Amount (SOL)"
             value={airdropAmount}
             onChange={(e) => setAirdropAmount(e.target.value)}
+            className="bg-background/50"
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleAirdrop} className="w-full">Request Airdrop</Button>
+          <Button onClick={handleAirdrop} className="w-full" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Coins className="mr-2 h-4 w-4" />}
+            Request Airdrop
+          </Button>
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
-          <CardTitle>Send Transaction</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5 text-primary" />
+            Send Transaction
+          </CardTitle>
           <CardDescription>Transfer SOL to another wallet</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -169,22 +233,30 @@ export const SolanaFeatures: React.FC = () => {
             placeholder="Recipient address"
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
+            className="bg-background/50"
           />
           <Input
             type="number"
             placeholder="Amount (SOL)"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            className="bg-background/50"
           />
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSendTransaction} className="w-full">Send SOL</Button>
+          <Button onClick={handleSendTransaction} className="w-full" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Send SOL
+          </Button>
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardHeader>
-          <CardTitle>Sign Message</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <FileSignature className="h-5 w-5 text-primary" />
+            Sign Message
+          </CardTitle>
           <CardDescription>Sign a message with your wallet</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -192,16 +264,20 @@ export const SolanaFeatures: React.FC = () => {
             placeholder="Enter message to sign"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            className="bg-background/50"
           />
           {signature && (
-            <div className="p-2 bg-muted rounded-md">
-              <h3 className="font-semibold">Signature:</h3>
+            <div className="p-2 bg-background/50 rounded-md">
+              <h3 className="font-semibold text-primary mb-1">Signature:</h3>
               <p className="text-sm break-all">{signature}</p>
             </div>
           )}
         </CardContent>
         <CardFooter>
-          <Button onClick={handleSignMessage} className="w-full">Sign Message</Button>
+          <Button onClick={handleSignMessage} className="w-full" disabled={isLoading}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSignature className="mr-2 h-4 w-4" />}
+            Sign Message
+          </Button>
         </CardFooter>
       </Card>
     </div>

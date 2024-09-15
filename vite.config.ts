@@ -1,9 +1,8 @@
-import path from "path"
-import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
-import { nodePolyfills } from 'vite-plugin-node-polyfills'
+import path from "path";
+import react from "@vitejs/plugin-react";
+import { nodePolyfills } from "vite-plugin-node-polyfills";
 
-export default defineConfig({
+const defineConfig = ({
   plugins: [react()],
   resolve: {
     alias: {
@@ -11,8 +10,10 @@ export default defineConfig({
     },
   },
   build: {
-		rollupOptions: {
-			plugins: [nodePolyfills()],
-		},
-	},
-})
+    rollupOptions: {
+      plugins: [nodePolyfills()],
+    },
+  },
+});
+
+export default defineConfig;
