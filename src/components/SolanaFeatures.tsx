@@ -6,6 +6,7 @@ import {
   Transaction,
   SystemProgram,
 } from "@solana/web3.js";
+import * as spl from "@solana/spl-token";
 import bs58 from "bs58";
 import {
   Card,
@@ -21,10 +22,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Buffer } from "buffer";
 import { TRANSACTION_TIME } from "@/constants";
-import { Loader2, RefreshCw, Send, FileSignature, Coins } from "lucide-react";
-import { ed25519 } from "@noble/curves/ed25519";
+import { Loader2, RefreshCw, Send, FileSignature, Coins, Wallet } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 window.Buffer = Buffer;
+
+interface TokenBalance {
+  mint: string;
+  balance: number;
+  symbol: string;
+  decimals: number;
+}
 
 export const SolanaFeatures: React.FC = () => {
   const { connection } = useConnection();
@@ -36,6 +44,8 @@ export const SolanaFeatures: React.FC = () => {
   const [signature, setSignature] = useState<string | null>(null);
   const [airdropAmount, setAirdropAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [tokenBalances, setTokenBalances] = useState<TokenBalance[]>([]);
+  const [selectedToken, setSelectedToken] = useState<string>("");
 
   const fetchBalance = useCallback(async () => {
     if (publicKey) {
@@ -49,11 +59,45 @@ export const SolanaFeatures: React.FC = () => {
     }
   }, [connection, publicKey]);
 
+  const fetchTokenBalances = useCallback(async () => {
+    if (publicKey) {
+      try {
+        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(publicKey, {
+          programId: spl.TOKEN_PROGRAM_ID,
+        });
+        console.log("Token accounts:", tokenAccounts);
+
+        const balances = await Promise.all(
+          tokenAccounts.value.map(async (accountInfo) => {
+            return {
+              mint: accountInfo.account.data["parsed"]["info"]["mint"],
+              owner: accountInfo.account.data["parsed"]["info"]["owner"],
+              balance: accountInfo.account.data["parsed"]["info"]["tokenAmount"]["amount"],
+              decimals: accountInfo.account.data["parsed"]["info"]["tokenAmount"]["decimals"],
+              symbol: "TOKEN", // mintInfo.symbol,
+            };
+          })
+        );
+
+        console.log("Token balances:", balances);
+
+        setTokenBalances(balances);
+      } catch (error) {
+        console.error("Error fetching token balances:", error);
+        toast.error("Failed to fetch token balances");
+      }
+    }
+  }, [connection, publicKey]);
+
   useEffect(() => {
     fetchBalance();
-    const id = setInterval(fetchBalance, 5000);
-    return () => clearInterval(id);
-  }, [fetchBalance]);
+    fetchTokenBalances();
+    // const id = setInterval(() => {
+    //   fetchBalance();
+    //   fetchTokenBalances();
+    // }, 5000);
+    // return () => clearInterval(id);
+  }, [fetchBalance, fetchTokenBalances]);
 
   const handleSendTransaction = async () => {
     if (!publicKey) {
@@ -114,14 +158,9 @@ export const SolanaFeatures: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      if (publicKey === null) {
-        toast.error("Wallet not connected");
-        return
-      }
       const encodedMessage = new TextEncoder().encode(message);
       const signedMessage = await signMessage(encodedMessage);
       setSignature(bs58.encode(signedMessage));
-      if (!ed25519.verify(signedMessage, encodedMessage, publicKey.toBytes())) throw new Error('Message signature invalid!');
       toast.success("Message signed successfully!");
     } catch (error) {
       console.error('Signing error:', error);
@@ -173,6 +212,89 @@ export const SolanaFeatures: React.FC = () => {
     }
   };
 
+const handleTokenTransfer = async () => {
+  if (!publicKey || !sendTransaction) {
+    toast.error("Wallet not connected");
+    return;
+  }
+  setIsLoading(true);
+  try {
+    const toPublicKey = new PublicKey(recipient);
+    const tokenMint = new PublicKey(selectedToken);
+    
+    const fromTokenAccount = await spl.getAssociatedTokenAddress(
+      tokenMint,
+      publicKey
+    );
+    
+    const toTokenAccount = await spl.getAssociatedTokenAddress(
+      tokenMint,
+      toPublicKey
+    );
+
+    const tokenInfo = tokenBalances.find(t => t.mint === selectedToken);
+    if (!tokenInfo) throw new Error("Token not found");
+
+    const tokenAmount = parseFloat(amount) * Math.pow(10, tokenInfo.decimals);
+    if (isNaN(tokenAmount) || tokenAmount <= 0) {
+      throw new Error("Invalid amount");
+    }
+
+    const transaction = new Transaction().add(
+      spl.createAssociatedTokenAccountInstruction(
+        publicKey,
+        toTokenAccount,
+        toPublicKey,
+        tokenMint
+      ),
+      spl.createTransferInstruction(
+        fromTokenAccount,
+        toTokenAccount,
+        publicKey,
+        BigInt(tokenAmount)
+      )
+    );
+
+    const latestBlockhash = await connection.getLatestBlockhash();
+    transaction.recentBlockhash = latestBlockhash.blockhash;
+    transaction.feePayer = publicKey;
+
+    const signature = await sendTransaction(transaction, connection);
+     const startTime = Date.now();
+      while (true) {
+        const { value: statuses } = await connection.getSignatureStatuses([
+          signature,
+        ]);
+
+        if (statuses[0]?.confirmationStatus === "confirmed") {
+          break;
+        }
+
+        if (Date.now() - startTime > TRANSACTION_TIME) {
+          throw new Error("Airdrop transaction timed out");
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+    // await connection.confirmTransaction({
+    //   signature,
+    //   blockhash: latestBlockhash.blockhash,
+    //   lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    // });
+
+    toast.success("Token transfer successful!");
+    fetchTokenBalances();
+    setAmount("");
+    setRecipient("");
+    setSelectedToken("");
+  } catch (error) {
+    console.error("Token transfer error:", error);
+    toast.error(`Failed to transfer tokens: ${(error as Error).message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+  
   return (
     <div className="grid gap-6 md:grid-cols-2">
       <Card className="col-span-full bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
@@ -277,6 +399,80 @@ export const SolanaFeatures: React.FC = () => {
           <Button onClick={handleSignMessage} className="w-full" disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSignature className="mr-2 h-4 w-4" />}
             Sign Message
+          </Button>
+        </CardFooter>
+      </Card>
+
+
+      <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wallet className="h-5 w-5 text-primary" />
+            Token Balances
+          </CardTitle>
+          <CardDescription>Your SPL token balances</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {tokenBalances.length > 0 ? (
+            tokenBalances.map((token) => (
+              <div key={token.mint} className="flex justify-between items-center">
+                <span>{token.symbol}</span>
+                <span>{token.balance/LAMPORTS_PER_SOL}</span>
+              </div>
+            ))
+          ) : (
+            <p>No token balances found</p>
+          )}
+        </CardContent>
+        <CardFooter>
+          <Button onClick={fetchTokenBalances} className="w-full" variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh Token Balances
+          </Button>
+        </CardFooter>
+      </Card>
+
+      {/* New feature: Let user transfer tokens */}
+      <Card className="bg-secondary/30 backdrop-blur-md border-border/50 shadow-lg hover:shadow-xl transition-shadow duration-300">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5 text-primary" />
+            Transfer Tokens
+          </CardTitle>
+          <CardDescription>Send SPL tokens to another wallet</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Select onValueChange={setSelectedToken}>
+            <SelectTrigger className="bg-background/50">
+              <SelectValue placeholder="Select token" />
+            </SelectTrigger>
+            <SelectContent>
+              {tokenBalances.map((token) => (
+                <SelectItem key={token.mint} value={token.mint}>
+                  {token.symbol}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Input
+            type="text"
+            placeholder="Recipient address"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value)}
+            className="bg-background/50"
+          />
+          <Input
+            type="number"
+            placeholder="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="bg-background/50"
+          />
+        </CardContent>
+        <CardFooter>
+          <Button onClick={handleTokenTransfer} className="w-full" disabled={isLoading || !selectedToken}>
+            {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Send Tokens
           </Button>
         </CardFooter>
       </Card>

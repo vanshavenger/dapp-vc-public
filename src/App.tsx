@@ -114,7 +114,7 @@ const App: React.FC = () => {
           </WalletModalProvider>
         </WalletProvider>
       </ConnectionProvider>
-      <Toaster richColors position="top-center" closeButton expand />
+      <Toaster richColors position="top-center" closeButton expand visibleToasts={2} />
     </ThemeProvider>
   );
 };
