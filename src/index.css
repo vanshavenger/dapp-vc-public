@@ -1,64 +1,238 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 10% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem}
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --background: 222 47% 11%;
+    --foreground: 214 32% 91%;
+    --card: 222 47% 11%;
+    --card-foreground: 214 32% 91%;
+    --popover: 222 47% 11%;
+    --popover-foreground: 214 32% 91%;
+    --primary: 183 74% 56%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 218 32% 17%;
+    --secondary-foreground: 214 32% 91%;
+    --muted: 218 32% 17%;
+    --muted-foreground: 214 20% 69%;
+    --accent: 183 74% 56%;
+    --accent-foreground: 222 47% 11%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%}
+    --destructive-foreground: 214 32% 91%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 183 74% 56%;
+    --radius: 0.5rem;
+  }
 }
+
 @layer base {
   * {
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-['DM_Sans',_sans-serif];
   }
+}
+
+/* Solana DApp Specific Styles */
+.solana-dapp-background {
+  background: linear-gradient(to bottom right, hsl(222, 47%, 11%), hsl(218, 32%, 17%));
+}
+
+.solana-dapp-header {
+  @apply bg-secondary/80 backdrop-blur-md;
+}
+
+.solana-dapp-feature-card {
+  @apply bg-secondary/60 border border-white/10 transition-all duration-300 ease-in-out;
+}
+
+.solana-dapp-feature-card:hover {
+  @apply bg-secondary/80 -translate-y-1 shadow-lg;
+}
+
+.solana-dapp-feature-icon {
+  @apply text-primary;
+}
+
+.solana-dapp-footer {
+  @apply bg-secondary/80;
+}
+
+/* Wallet Adapter Styles */
+.wallet-adapter-button {
+  @apply bg-secondary text-foreground cursor-pointer flex items-center font-semibold h-12 px-6 rounded-lg transition-all duration-200 ease-in-out;
+}
+
+.wallet-adapter-button-trigger {
+  @apply bg-primary text-primary-foreground;
+}
+
+.wallet-adapter-button:not([disabled]):focus-visible {
+  @apply outline-primary;
+}
+
+.wallet-adapter-button:not([disabled]):hover {
+  @apply bg-primary/80 text-primary-foreground;
+}
+
+.wallet-adapter-button[disabled] {
+  @apply bg-muted text-muted-foreground cursor-not-allowed;
+}
+
+.wallet-adapter-dropdown {
+  @apply relative;
+}
+
+.wallet-adapter-dropdown-list {
+  @apply absolute right-0 mt-2 p-2 bg-popover border border-border rounded-lg shadow-xl;
+  min-width: 200px;
+  z-index: 9999;
+}
+
+.wallet-adapter-dropdown-list-item {
+  @apply bg-transparent transition-colors duration-200 text-foreground px-4 py-2 rounded-md;
+}
+
+.wallet-adapter-dropdown-list-item:not([disabled]):hover {
+  @apply bg-primary/10;
+}
+
+.wallet-adapter-modal-wrapper {
+  @apply bg-background rounded-xl shadow-2xl max-w-md w-full mx-4;
+}
+
+.wallet-adapter-modal-title {
+  @apply text-primary text-2xl font-bold mb-6;
+}
+
+.wallet-adapter-modal-button-close {
+  @apply bg-secondary hover:bg-secondary/80 transition-colors duration-200;
+}
+
+.wallet-adapter-modal-button-close:hover svg {
+  @apply fill-primary;
+}
+
+.wallet-adapter-modal-list {
+  @apply space-y-2;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  @apply bg-secondary transition-colors duration-200 justify-between w-full;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  @apply bg-primary/20;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button-end-icon,
+.wallet-adapter-modal-list .wallet-adapter-button-start-icon,
+.wallet-adapter-modal-list .wallet-adapter-button-end-icon img,
+.wallet-adapter-modal-list .wallet-adapter-button-start-icon img {
+  @apply w-8 h-8;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button span {
+  @apply text-sm text-foreground;
+}
+
+.wallet-adapter-modal-middle {
+  @apply px-6 pb-6;
+}
+
+.wallet-adapter-modal-middle-button {
+  @apply bg-primary text-primary-foreground w-full py-3 rounded-lg text-lg font-semibold transition-all duration-200 ease-in-out hover:bg-primary/80 mt-6;
+}
+
+/* Additional styles for better spacing and design */
+.wallet-adapter-modal-container {
+  @apply p-6;
+}
+
+.wallet-adapter-modal-wrapper {
+  @apply p-6;
+}
+
+.wallet-adapter-modal-list-more {
+  @apply text-primary hover:text-primary/80 transition-colors duration-200 flex items-center justify-center w-full py-2;
+}
+
+.wallet-adapter-modal-list-more svg {
+  @apply ml-2;
+}
+
+.wallet-adapter-modal-overlay {
+  @apply bg-background/80 backdrop-blur-sm;
+}
+
+/* Improved modal text readability */
+.wallet-adapter-modal {
+  @apply text-foreground;
+}
+
+.wallet-adapter-modal-title {
+  @apply text-foreground;
+}
+
+.wallet-adapter-modal-content {
+  @apply text-foreground/90;
+}
+
+/* Clean up modal design */
+.wallet-adapter-modal {
+  @apply flex items-center justify-center;
+}
+
+.wallet-adapter-modal-wrapper {
+  @apply bg-secondary border border-border;
+}
+
+.wallet-adapter-modal-button-close {
+  @apply absolute top-4 right-4 p-2 rounded-full;
+}
+
+.wallet-adapter-modal-title {
+  @apply text-center mb-4;
+}
+
+.wallet-adapter-modal-list {
+  @apply mb-4;
+}
+
+.wallet-adapter-modal-list-more {
+  @apply mt-2;
+}
+
+/* Ensure dropdown and modal are above other elements */
+.wallet-adapter-dropdown-list,
+.wallet-adapter-modal-container {
+  z-index: 9999;
+}
+
+/* Improve hover text animations */
+.wallet-adapter-button,
+.wallet-adapter-dropdown-list-item,
+.wallet-adapter-modal-list .wallet-adapter-button {
+  @apply transition-all duration-200 ease-in-out;
+}
+
+.wallet-adapter-button:hover,
+.wallet-adapter-dropdown-list-item:hover,
+.wallet-adapter-modal-list .wallet-adapter-button:hover {
+  @apply text-primary;
+}
+
+/* Ensure wallet buttons are always visible */
+.wallet-adapter-dropdown {
+  @apply relative z-50;
+}
+
+/* Adjust the header to ensure wallet buttons are clickable */
+.solana-dapp-header {
+  @apply relative z-50;
 }

@@ -1,7 +1,7 @@
 import path from "path"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
-import inject from '@rollup/plugin-inject'
+import { nodePolyfills } from 'vite-plugin-node-polyfills'
 
 export default defineConfig({
   plugins: [react()],
@@ -12,7 +12,7 @@ export default defineConfig({
   },
   build: {
 		rollupOptions: {
-			plugins: [inject({ Buffer: ['buffer', 'Buffer'] })],
+			plugins: [nodePolyfills()],
 		},
 	},
 })
